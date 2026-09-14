@@ -1,4 +1,4 @@
-(() => {
+  (() => {
 	const supportsFinePointer = window.matchMedia('(pointer: fine)').matches;
 	const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -52,3 +52,17 @@
 	render();
 	window.addEventListener('pagehide', () => cancelAnimationFrame(animationFrame));
 })();
+
+const themeBtn = document.getElementById("themeBtn");
+
+themeBtn.addEventListener("click", function () {
+
+    document.body.classList.toggle("light-mode");
+
+    if (document.body.classList.contains("light-mode")) {
+        themeBtn.textContent = "🌙 Dark Mode";
+    } else {
+        themeBtn.textContent = "☀️ Light Mode";
+    }
+
+});
