@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome | Fridaous Yusuph</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-body">
+    <main class="auth-shell">
+        <section class="auth-card" aria-labelledby="authTitle">
+            <p class="eyebrow">Fridaous Yusuph</p>
+            <h1 id="authTitle">Welcome to my website</h1>
+            <p id="authIntro">Create an account to enter the site.</p>
+            <div class="auth-tabs" role="tablist" aria-label="Account access" hidden>
+                <button class="auth-tab active" id="signupTab" type="button" role="tab" aria-selected="true">Create account</button>
+                <button class="auth-tab" id="loginTab" type="button" role="tab" aria-selected="false">Log in</button>
+            </div>
+            <form id="signupForm">
+                <label for="signupName">Name</label>
+                <input id="signupName" name="name" type="text" autocomplete="name" required>
+                <label for="signupEmail">Email</label>
+                <input id="signupEmail" name="email" type="email" autocomplete="email" required>
+                <label for="signupPassword">Password</label>
+                <input id="signupPassword" name="password" type="password" minlength="8" autocomplete="new-password" required>
+                <label for="signupConfirmPassword">Confirm password</label>
+                <input id="signupConfirmPassword" name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required>
+                <button class="auth-submit" type="submit">Create account</button>
+                <p class="auth-switch">
+                    Already have an account?
+                    <a href="/login.html" id="signupToLogin">Log in</a>
+                </p>
+            </form>
+            <form id="verificationForm" hidden>
+                <p class="verification-notice">We sent a six-digit verification code to your email address.</p>
+                <label for="verificationEmail">Email</label>
+                <input id="verificationEmail" name="email" type="email" readonly>
+                <label for="verificationCode">Verification code</label>
+                <input id="verificationCode" name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required>
+                <button class="auth-submit" type="submit">Verify email</button>
+                <button class="auth-back" id="useDifferentEmail" type="button">Use a different email</button>
+            </form>
+            <p class="auth-message" id="authMessage" role="alert" hidden></p>
+        </section>
+    </main>
+    <script src="auth.js"></script>
+</body>
+</html>

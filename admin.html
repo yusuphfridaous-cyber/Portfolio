@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin | Site Monitor</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+<body class="admin-body">
+    <nav>
+        <h2>Fridaous / Admin</h2>
+        <div class="nav-links">
+            <a href="home.html">View site</a>
+            <a href="projects.html">Projects</a>
+            <a href="contact.html">Contact</a>
+            <button id="adminLogout" class="admin-button secondary" type="button">Log out</button>
+        </div>
+        <button id="themeBtn" type="button">🌙</button>
+    </nav>
+
+    <main class="admin-dashboard" id="adminDashboard" hidden>
+        <header class="admin-header">
+            <div>
+                <p class="eyebrow">Private control room</p>
+                <h1>Site monitor</h1>
+                <p>See how this browser is interacting with your website. No contact message contents are stored.</p>
+            </div>
+            <div class="admin-actions">
+                <button id="refreshAnalytics" class="admin-button" type="button">↻ Refresh</button>
+                <button id="exportAnalytics" class="admin-button secondary" type="button">↓ Export</button>
+                <button id="clearAnalytics" class="admin-button danger" type="button">Clear data</button>
+            </div>
+        </header>
+
+        <section class="metrics-grid" aria-label="Website metrics">
+            <article class="metric-card"><span>Page views</span><strong id="pageViews">0</strong><small>Recorded locally</small></article>
+            <article class="metric-card"><span>Sessions</span><strong id="sessions">0</strong><small>Unique browser visits</small></article>
+            <article class="metric-card"><span>Interactions</span><strong id="interactions">0</strong><small>Clicks and form activity</small></article>
+            <article class="metric-card accent"><span>Contact actions</span><strong id="contactActions">0</strong><small>Form submissions</small></article>
+        </section>
+
+        <section class="admin-panel registered-users-panel">
+            <div class="panel-heading"><div><p class="eyebrow">Account directory</p><h2>People who signed up</h2></div><span id="registeredUserCount">0 accounts</span></div>
+            <div id="registeredUsers" class="registered-users"><p class="empty-state">No accounts yet.</p></div>
+        </section>
+
+        <section class="admin-grid">
+            <article class="admin-panel chart-panel">
+                <div class="panel-heading"><div><p class="eyebrow">Last 7 days</p><h2>Traffic pulse</h2></div><span id="lastUpdated">Waiting for data</span></div>
+                <div id="trafficChart" class="traffic-chart" aria-label="Page views over the last seven days"></div>
+            </article>
+            <article class="admin-panel">
+                <div class="panel-heading"><div><p class="eyebrow">Where people go</p><h2>Popular pages</h2></div></div>
+                <div id="popularPages" class="data-list"><p class="empty-state">No page views yet.</p></div>
+            </article>
+        </section>
+
+        <section class="admin-panel activity-panel">
+            <div class="panel-heading"><div><p class="eyebrow">Live history</p><h2>Recent activity</h2></div><span>Newest first</span></div>
+            <div id="recentActivity" class="activity-list"><p class="empty-state">Activity will appear here as visitors use the site.</p></div>
+        </section>
+
+        <section class="analytics-note">
+            <strong>Local monitoring is active.</strong> This dashboard reads data saved in this browser only. For visitors across all devices, set your GoatCounter site code in <code>script.js</code> and use its private dashboard.
+            <a id="dashboardLink" href="https://www.goatcounter.com/">Open GoatCounter</a>
+        </section>
+    </main>
+    <section class="admin-login" id="adminLogin" aria-labelledby="adminLoginTitle">
+        <p class="eyebrow">Private control room</p>
+        <h1 id="adminLoginTitle">Admin access</h1>
+        <p>Enter your passcode to open the site monitor.</p>
+        <form id="adminLoginForm">
+            <label for="adminPasscode">Passcode</label>
+            <input id="adminPasscode" name="passcode" type="password" autocomplete="current-password" required>
+            <button class="admin-button" type="submit">Unlock dashboard</button>
+            <p class="admin-login-error" id="adminLoginError" role="alert" hidden>That passcode is not correct.</p>
+        </form>
+    </section>
+    <script>
+        const activityKey = "fridaous-site-activity";
+        const adminDashboard = document.getElementById("adminDashboard");
+        const adminLogin = document.getElementById("adminLogin");
+        const adminLoginForm = document.getElementById("adminLoginForm");
+        const adminLoginError = document.getElementById("adminLoginError");
+        const getStoredActivity = () => window.siteAnalytics?.getActivity() || [];
+        const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
+        const loadRegisteredUsers = async () => {
+            const response = await fetch("/api/admin/users");
+            if (!response.ok) return;
+            const { users } = await response.json();
+            document.getElementById("registeredUserCount").textContent = `${users.length} account${users.length === 1 ? "" : "s"}`;
+            document.getElementById("registeredUsers").innerHTML = users.length ? users.map((user) => `<div class="registered-user"><div><strong>${escapeHtml(user.name)}</strong><span>${escapeHtml(user.email)}</span></div><time datetime="${escapeHtml(user.createdAt)}">${formatTime(user.createdAt)}</time></div>`).join("") : '<p class="empty-state">No accounts yet.</p>';
+        };
+        const unlockDashboard = () => {
+            adminLogin.hidden = true;
+            adminDashboard.hidden = false;
+            renderDashboard();
+            loadRegisteredUsers();
+        };
+        const formatTime = (timestamp) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(timestamp));
+        const pageName = (path) => path.replace(".html", "").replace("index", "home") || "home";
+
+        const renderDashboard = () => {
+            const activity = getStoredActivity();
+            const pageViews = activity.filter((item) => item.type === "page_view");
+            const interactions = activity.filter((item) => item.type !== "page_view");
+            const submissions = activity.filter((item) => item.type === "form_submit");
+            const sessions = new Set(activity.map((item) => item.sessionId).filter(Boolean));
+            document.getElementById("pageViews").textContent = pageViews.length;
+            document.getElementById("sessions").textContent = sessions.size;
+            document.getElementById("interactions").textContent = interactions.length;
+            document.getElementById("contactActions").textContent = submissions.length;
+            document.getElementById("lastUpdated").textContent = activity.length ? `Updated ${formatTime(activity.at(-1).timestamp)}` : "Waiting for data";
+
+            const pageCounts = pageViews.reduce((counts, item) => { counts[item.path] = (counts[item.path] || 0) + 1; return counts; }, {});
+            const pageEntries = Object.entries(pageCounts).sort((a, b) => b[1] - a[1]);
+            document.getElementById("popularPages").innerHTML = pageEntries.length ? pageEntries.map(([page, count]) => `<div class="data-row"><span>${pageName(page)}</span><strong>${count}</strong></div>`).join("") : '<p class="empty-state">No page views yet.</p>';
+
+            const days = Array.from({ length: 7 }, (_, index) => { const date = new Date(); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() - (6 - index)); return date; });
+            const dayCounts = days.map((day) => pageViews.filter((item) => new Date(item.timestamp).toDateString() === day.toDateString()).length);
+            const maxCount = Math.max(...dayCounts, 1);
+            document.getElementById("trafficChart").innerHTML = days.map((day, index) => `<div class="chart-column"><span class="chart-value">${dayCounts[index]}</span><div class="chart-bar" style="height: ${Math.max((dayCounts[index] / maxCount) * 100, 5)}%"></div><small>${day.toLocaleDateString(undefined, { weekday: "short" })}</small></div>`).join("");
+
+            const recent = activity.slice(-12).reverse();
+            document.getElementById("recentActivity").innerHTML = recent.length ? recent.map((item) => `<div class="activity-row"><span class="activity-dot ${item.type}"></span><div><strong>${item.type.replace("_", " ")}</strong><small>${item.label || pageName(item.path)} · ${formatTime(item.timestamp)}</small></div></div>`).join("") : '<p class="empty-state">Activity will appear here as visitors use the site.</p>';
+        };
+
+        adminLoginForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const passcode = new FormData(adminLoginForm).get("passcode");
+            const response = await fetch("/api/admin/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: passcode })
+            });
+            if (response.ok) {
+                adminLoginForm.reset();
+                unlockDashboard();
+                return;
+            }
+            const result = await response.json().catch(() => ({}));
+            adminLoginError.textContent = result.error || "That password is not correct.";
+            adminLoginError.hidden = false;
+        });
+
+        document.getElementById("adminLogout").addEventListener("click", async () => {
+            await fetch("/api/admin/logout", { method: "POST" });
+            adminDashboard.hidden = true;
+            adminLogin.hidden = false;
+        });
+
+        document.getElementById("refreshAnalytics").addEventListener("click", renderDashboard);
+        document.getElementById("refreshAnalytics").addEventListener("click", loadRegisteredUsers);
+        document.getElementById("exportAnalytics").addEventListener("click", () => {
+            const blob = new Blob([JSON.stringify(getStoredActivity(), null, 2)], { type: "application/json" });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "site-activity.json"; link.click(); URL.revokeObjectURL(link.href);
+        });
+        document.getElementById("clearAnalytics").addEventListener("click", () => { if (confirm("Clear all locally stored activity?")) { localStorage.removeItem(activityKey); renderDashboard(); } });
+        fetch("/api/admin/session")
+            .then((response) => { if (response.ok) unlockDashboard(); })
+            .catch(() => {});
+    </script>
+</body>
+</html>
