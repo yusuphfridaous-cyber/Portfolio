@@ -22,16 +22,18 @@ const pendingVerifications = new Map();
 const loginAttempts = new Map();
 const sessionDuration = 8 * 60 * 60 * 1000;
 const smtpPort = Number(process.env.SMTP_PORT) || 587;
-const mailTransporter = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD ? nodemailer.createTransport({
+const smtpPassword = (process.env.SMTP_PASSWORD || "").replace(/\s+/g, "");
+const mailTransporter = process.env.SMTP_HOST && process.env.SMTP_USER && smtpPassword ? nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: smtpPort,
     secure: smtpPort === 465,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
+    auth: { user: process.env.SMTP_USER, pass: smtpPassword }
 }) : null;
-const emailProvider = (process.env.EMAIL_PROVIDER || "smtp").toLowerCase();
+const emailProvider = ((process.env.EMAIL_PROVIDER && process.env.EMAIL_PROVIDER.toLowerCase()) || (mailTransporter ? "smtp" : "resend")).toLowerCase();
 const emailVerificationConfigured = emailProvider === "resend"
     ? Boolean(process.env.RESEND_API_KEY)
     : Boolean(mailTransporter);
+const verificationFromAddress = process.env.EMAIL_FROM || process.env.SMTP_USER || "onboarding@resend.dev";
 
 const mimeTypes = {
     ".css": "text/css; charset=utf-8",
@@ -108,7 +110,7 @@ const sendVerificationEmail = (email, code) => {
             method: "POST",
             headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({
-                from: process.env.EMAIL_FROM || "onboarding@resend.dev",
+                from: verificationFromAddress,
                 to: [email],
                 subject: "Your website verification code",
                 text: `Your verification code is ${code}. It expires in 10 minutes.`,
@@ -121,7 +123,7 @@ const sendVerificationEmail = (email, code) => {
     }
     if (!mailTransporter) throw new Error("SMTP is not configured.");
     return mailTransporter.sendMail({
-        from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+        from: verificationFromAddress,
         to: email,
         subject: "Your website verification code",
         text: `Your verification code is ${code}. It expires in 10 minutes.`,
@@ -277,7 +279,9 @@ const server = http.createServer(async (request, response) => {
         } catch (error) {
             pendingVerifications.delete(email);
             console.error("Verification email failed:", error.message);
-            sendJson(response, 502, { error: "We could not send the verification email. Check the email address and try again." });
+            sendJson(response, 502, {
+                error: `We could not send the verification email: ${error.message || "Check the email address and try again."}`
+            });
             return;
         }
         sendJson(response, 202, { verificationRequired: true, email });
