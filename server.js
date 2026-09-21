@@ -153,7 +153,7 @@ const getSiteSession = (request) => {
     return session;
 };
 
-const publicFiles = new Set(["/auth.html", "/auth.js", "/style.css"]);
+const publicFiles = new Set(["/auth.html", "/login.html", "/auth.js", "/login.js", "/style.css"]);
 
 const passwordsMatch = (providedPassword) => {
     if (!adminPassword || typeof providedPassword !== "string") return false;
@@ -178,7 +178,7 @@ const recordFailedAttempt = (ip) => {
 };
 
 const serveFile = (request, response, pathname) => {
-    const requestedPath = pathname === "/" ? "/home.html" : pathname;
+    const requestedPath = pathname === "/" ? "/auth.html" : pathname;
     if (requestedPath.split("/").some((segment) => segment.startsWith("."))) {
         response.writeHead(404);
         response.end("Not found");
