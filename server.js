@@ -441,9 +441,13 @@ const server = http.createServer(async (request, response) => {
     serveFile(request, response, requestUrl.pathname);
 });
 
-server.listen(port, () => {
-    console.log(`Site running at http://localhost:${port}`);
-});
+if (process.env.VERCEL) {
+    module.exports = (request, response) => server.emit("request", request, response);
+} else {
+    server.listen(port, () => {
+        console.log(`Site running at http://localhost:${port}`);
+    });
+}
 
 setInterval(() => {
     for (const [sessionId, session] of sessions) {
