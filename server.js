@@ -16,6 +16,7 @@ const publicDirectory = __dirname;
 const port = Number(process.env.PORT) || 3000;
 const adminPassword = process.env.ADMIN_PASSWORD;
 const usersFile = path.join(__dirname, "users.json");
+const analyticsFile = path.join(__dirname, "analytics.json");
 const sessions = new Map();
 const siteSessions = new Map();
 const pendingVerifications = new Map();
@@ -34,6 +35,8 @@ const emailVerificationConfigured = emailProvider === "resend"
     ? Boolean(process.env.RESEND_API_KEY)
     : Boolean(mailTransporter);
 const verificationFromAddress = process.env.EMAIL_FROM || process.env.SMTP_USER || "onboarding@resend.dev";
+const accessNotificationRecipient = process.env.EMAIL_NOTIFICATION_TO || process.env.SMTP_USER;
+const monitoredPages = new Set(["/about.html", "/projects.html", "/contact.html"]);
 
 const mimeTypes = {
     ".css": "text/css; charset=utf-8",
@@ -85,6 +88,13 @@ const readUsers = () => {
 
 const writeUsers = (users) => fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
 
+const readAnalytics = () => {
+    try { return JSON.parse(fs.readFileSync(analyticsFile, "utf8")); }
+    catch (error) { return []; }
+};
+
+const writeAnalytics = (events) => fs.writeFileSync(analyticsFile, JSON.stringify(events.slice(-2000), null, 2));
+
 const hashPassword = (password, salt = crypto.randomBytes(16).toString("hex")) => new Promise((resolve, reject) => {
     crypto.scrypt(password, salt, 64, (error, derivedKey) => {
         if (error) reject(error);
@@ -131,6 +141,25 @@ const sendVerificationEmail = (email, code) => {
     });
 };
 
+const sendAccessNotification = (page, user) => {
+    if (!accessNotificationRecipient) return Promise.resolve();
+    const visitor = user ? `${user.name} (${user.email})` : "an authenticated visitor";
+    const subject = `Website access: ${page.replace(".html", "")}`;
+    const text = `${visitor} opened ${page} at ${new Date().toISOString()}.`;
+    if (emailProvider === "resend" && process.env.RESEND_API_KEY) {
+        return fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ from: verificationFromAddress, to: [accessNotificationRecipient], subject, text })
+        }).then(async (response) => {
+            if (!response.ok) throw new Error(`Resend returned ${response.status}.`);
+            return response.json();
+        });
+    }
+    if (!mailTransporter) return Promise.resolve();
+    return mailTransporter.sendMail({ from: verificationFromAddress, to: accessNotificationRecipient, subject, text });
+};
+
 const createSessionCookie = (name, value, request) => {
     const isHttps = request.socket.encrypted || request.headers["x-forwarded-proto"] === "https";
     return `${name}=${value}; HttpOnly; Path=/; SameSite=Lax${isHttps ? "; Secure" : ""}`;
@@ -153,7 +182,10 @@ const getSiteSession = (request) => {
     return session;
 };
 
-const publicFiles = new Set(["/auth.html", "/login.html", "/auth.js", "/login.js", "/style.css"]);
+const publicFiles = new Set([
+    "/index.html", "/auth.html", "/login.html", "/auth.js", "/login.js", "/script.js", "/style.css",
+    "/Fridaous Yusuph.jpeg", "/image-removebg-preview.png", "/IMG-20260818-WA0115.jpg", "/mine.png"
+]);
 
 const passwordsMatch = (providedPassword) => {
     if (!adminPassword || typeof providedPassword !== "string") return false;
@@ -178,13 +210,19 @@ const recordFailedAttempt = (ip) => {
 };
 
 const serveFile = (request, response, pathname) => {
-    const requestedPath = pathname === "/" ? "/auth.html" : pathname;
+    const requestedPath = pathname === "/" ? "/index.html" : pathname;
+    const siteSession = getSiteSession(request);
     if (requestedPath.split("/").some((segment) => segment.startsWith("."))) {
         response.writeHead(404);
         response.end("Not found");
         return;
     }
-    if (!publicFiles.has(requestedPath) && !getSiteSession(request)) {
+    if (requestedPath === "/admin.html" && !getSession(request)) {
+        response.writeHead(302, { Location: "/login.html?admin=1" });
+        response.end();
+        return;
+    }
+    if (!publicFiles.has(requestedPath) && requestedPath !== "/admin.html" && !siteSession) {
         response.writeHead(302, { Location: `/auth.html?redirect=${encodeURIComponent(requestedPath)}` });
         response.end();
         return;
@@ -194,6 +232,11 @@ const serveFile = (request, response, pathname) => {
         response.writeHead(403);
         response.end("Forbidden");
         return;
+    }
+
+    if (siteSession && request.method === "GET" && monitoredPages.has(requestedPath)) {
+        const user = readUsers().find((candidate) => candidate.id === siteSession.userId);
+        sendAccessNotification(requestedPath.slice(1), user).catch((error) => console.error("Access notification failed:", error.message));
     }
 
     fs.readFile(filePath, (error, file) => {
@@ -357,6 +400,24 @@ const server = http.createServer(async (request, response) => {
     if (requestUrl.pathname === "/api/admin/session" && request.method === "GET") {
         const authenticated = Boolean(getSession(request));
         sendJson(response, authenticated ? 200 : 401, { authenticated });
+        return;
+    }
+
+    if (requestUrl.pathname === "/api/analytics/track" && request.method === "POST") {
+        let body;
+        try { body = JSON.parse(await readRequestBody(request)); } catch (error) { sendJson(response, 400, { error: "Invalid request." }); return; }
+        const allowedTypes = new Set(["page_view", "click", "form_submit"]);
+        if (!allowedTypes.has(body.type)) { sendJson(response, 400, { error: "Invalid activity type." }); return; }
+        const events = readAnalytics();
+        events.push({ type: body.type, page: String(body.page || "unknown").slice(0, 120), label: String(body.label || "").slice(0, 80), timestamp: new Date().toISOString(), sessionId: String(body.sessionId || "unknown").slice(0, 80) });
+        writeAnalytics(events);
+        sendJson(response, 202, { recorded: true });
+        return;
+    }
+
+    if (requestUrl.pathname === "/api/admin/analytics" && request.method === "GET") {
+        if (!getSession(request)) { sendJson(response, 401, { error: "Admin authentication required." }); return; }
+        sendJson(response, 200, { activity: readAnalytics() });
         return;
     }
 

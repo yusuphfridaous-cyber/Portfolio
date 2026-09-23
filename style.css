@@ -72,11 +72,24 @@ body.light-mode .page h2 {
 /* Theme Button */
 
 #themeBtn {
-    padding: 10px 15px;
-    border: none;
-    border-radius: 8px;
+    display: inline-flex;
+    width: 42px;
+    height: 30px;
+    padding: 4px;
+    border: 1px solid transparent;
+    border-radius: 7px;
     background: linear-gradient(90deg, #8b5cf6, #22d3ee);
     color: white;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform .2s ease, box-shadow .2s ease;
+    box-shadow: 0 5px 14px rgba(34, 211, 238, .2);
+}
+
+#themeBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px rgba(34, 211, 238, .24);
 }
 a.link{
     text-decoration: none;
@@ -401,7 +414,78 @@ footer {
 }
 
 nav {
+    width: 100%;
     max-width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 18px 6%;
+}
+
+nav > .nav {
+    position: static;
+    grid-column: 1;
+    width: auto;
+    padding: 0;
+    margin: 0;
+    justify-self: center;
+}
+
+.auth-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.nav-actions {
+    grid-column: 2;
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.auth-link {
+    display: inline-flex;
+    min-width: 102px;
+    height: 32px;
+    padding: 5px 14px;
+    border: 1px solid rgba(34, 211, 238, .45);
+    border-radius: 7px;
+    color: #f8fafc;
+    font-size: .9rem;
+    font-weight: 700;
+    text-align: center;
+    white-space: nowrap;
+    align-items: center;
+    justify-content: center;
+    transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.auth-link:hover {
+    color: #22d3ee;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px rgba(34, 211, 238, .18);
+}
+
+.signup-link {
+    background: linear-gradient(90deg, #8b5cf6, #22d3ee);
+    border-color: transparent;
+    box-shadow: 0 5px 14px rgba(34, 211, 238, .2);
+}
+
+.signup-link:hover {
+    color: #fff;
+}
+
+body.light-mode .auth-link {
+    color: #0f172a;
+}
+
+body.light-mode .signup-link {
+    color: #fff;
 }
 
 .page {
@@ -577,8 +661,20 @@ footer h3 {
     }
 
     nav {
+        display: flex;
         flex-direction: column;
         text-align: center;
+    }
+
+    .nav-actions {
+        margin-left: 0;
+        justify-content: center;
+    }
+
+    nav > .nav {
+        position: static;
+        transform: none;
+        grid-column: auto;
     }
 
     nav h2 {
@@ -588,6 +684,10 @@ footer h3 {
     .nav-links {
         gap: 14px;
         flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .auth-actions {
         justify-content: center;
     }
 
@@ -704,9 +804,9 @@ body.cursor-ready.cursor-visible .cursor-ring {
 }
 
 body.cursor-ready.cursor-hover .cursor-ring {
-    width: 52px;
-    height: 52px;
-    margin: -26px 0 0 -26px;
+    width: 64px;
+    height: 32px;
+    padding: 5px;
     border-color: #a78bfa;
     background: rgba(167, 139, 250, .14);
 }

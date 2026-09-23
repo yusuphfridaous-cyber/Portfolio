@@ -83,7 +83,8 @@
         const adminLogin = document.getElementById("adminLogin");
         const adminLoginForm = document.getElementById("adminLoginForm");
         const adminLoginError = document.getElementById("adminLoginError");
-        const getStoredActivity = () => window.siteAnalytics?.getActivity() || [];
+        let serverActivity = [];
+        const getStoredActivity = () => serverActivity.length ? serverActivity : (window.siteAnalytics?.getActivity() || []);
         const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
         const loadRegisteredUsers = async () => {
             const response = await fetch("/api/admin/users");
@@ -95,7 +96,7 @@
         const unlockDashboard = () => {
             adminLogin.hidden = true;
             adminDashboard.hidden = false;
-            renderDashboard();
+            loadAnalytics();
             loadRegisteredUsers();
         };
         const formatTime = (timestamp) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(timestamp));
@@ -113,7 +114,7 @@
             document.getElementById("contactActions").textContent = submissions.length;
             document.getElementById("lastUpdated").textContent = activity.length ? `Updated ${formatTime(activity.at(-1).timestamp)}` : "Waiting for data";
 
-            const pageCounts = pageViews.reduce((counts, item) => { counts[item.path] = (counts[item.path] || 0) + 1; return counts; }, {});
+            const pageCounts = pageViews.reduce((counts, item) => { const page = item.page || item.path || "unknown"; counts[page] = (counts[page] || 0) + 1; return counts; }, {});
             const pageEntries = Object.entries(pageCounts).sort((a, b) => b[1] - a[1]);
             document.getElementById("popularPages").innerHTML = pageEntries.length ? pageEntries.map(([page, count]) => `<div class="data-row"><span>${pageName(page)}</span><strong>${count}</strong></div>`).join("") : '<p class="empty-state">No page views yet.</p>';
 
@@ -123,7 +124,15 @@
             document.getElementById("trafficChart").innerHTML = days.map((day, index) => `<div class="chart-column"><span class="chart-value">${dayCounts[index]}</span><div class="chart-bar" style="height: ${Math.max((dayCounts[index] / maxCount) * 100, 5)}%"></div><small>${day.toLocaleDateString(undefined, { weekday: "short" })}</small></div>`).join("");
 
             const recent = activity.slice(-12).reverse();
-            document.getElementById("recentActivity").innerHTML = recent.length ? recent.map((item) => `<div class="activity-row"><span class="activity-dot ${item.type}"></span><div><strong>${item.type.replace("_", " ")}</strong><small>${item.label || pageName(item.path)} · ${formatTime(item.timestamp)}</small></div></div>`).join("") : '<p class="empty-state">Activity will appear here as visitors use the site.</p>';
+            document.getElementById("recentActivity").innerHTML = recent.length ? recent.map((item) => `<div class="activity-row"><span class="activity-dot ${item.type}"></span><div><strong>${item.type.replace("_", " ")}</strong><small>${item.label || pageName(item.page || item.path || "unknown")} · ${formatTime(item.timestamp)}</small></div></div>`).join("") : '<p class="empty-state">Activity will appear here as visitors use the site.</p>';
+        };
+
+        const loadAnalytics = async () => {
+            try {
+                const response = await fetch("/api/admin/analytics");
+                if (response.ok) serverActivity = (await response.json()).activity || [];
+            } catch (error) {}
+            renderDashboard();
         };
 
         adminLoginForm.addEventListener("submit", async (event) => {
@@ -150,7 +159,7 @@
             adminLogin.hidden = false;
         });
 
-        document.getElementById("refreshAnalytics").addEventListener("click", renderDashboard);
+        document.getElementById("refreshAnalytics").addEventListener("click", loadAnalytics);
         document.getElementById("refreshAnalytics").addEventListener("click", loadRegisteredUsers);
         document.getElementById("exportAnalytics").addEventListener("click", () => {
             const blob = new Blob([JSON.stringify(getStoredActivity(), null, 2)], { type: "application/json" });

@@ -40,10 +40,25 @@
 	});
 
 	document.addEventListener('pointerout', (event) => {
-		if (event.target.closest('a, button, input, textarea, select')) {
+		const fromInteractive = event.target.closest('a, button, input, textarea, select');
+		const toInteractive = event.relatedTarget?.closest?.('a, button, input, textarea, select');
+		if (fromInteractive && fromInteractive !== toInteractive) {
 			document.body.classList.remove('cursor-hover');
 		}
 	});
+
+	const resetCursor = () => {
+		document.body.classList.remove('cursor-hover', 'cursor-visible');
+		ringX = -100;
+		ringY = -100;
+		dot.style.transform = 'translate3d(-100px, -100px, 0)';
+		ring.style.transform = 'translate3d(-100px, -100px, 0)';
+	};
+
+	document.addEventListener('pointerdown', resetCursor);
+	document.addEventListener('click', resetCursor);
+	document.addEventListener('pointerleave', resetCursor);
+	window.addEventListener('blur', resetCursor);
 
 	document.addEventListener('mouseleave', () => {
 		document.body.classList.remove('cursor-visible');
@@ -51,6 +66,15 @@
 
 	render();
 	window.addEventListener('pagehide', () => cancelAnimationFrame(animationFrame));
+	window.addEventListener('pageshow', () => {
+		cancelAnimationFrame(animationFrame);
+		if (pointerX > -100 && pointerY > -100) {
+			ringX = pointerX;
+			ringY = pointerY;
+			document.body.classList.add('cursor-visible');
+		}
+		render();
+	});
 })();
 
 const themeBtn = document.getElementById("themeBtn");
@@ -84,16 +108,18 @@ const getActivity = () => {
 };
 
 const recordActivity = (type, details = {}) => {
+	const event = {
+		type,
+		page: window.location.pathname.split("/").pop() || "home.html",
+		label: details.label || "",
+		timestamp: new Date().toISOString(),
+		sessionId: sessionStorage.getItem(sessionStorageKey) || "unknown"
+	};
 	try {
 		const activity = getActivity();
-		activity.push({
-			type,
-			path: window.location.pathname.split("/").pop() || "home.html",
-			label: details.label || "",
-			timestamp: new Date().toISOString(),
-			sessionId: sessionStorage.getItem(sessionStorageKey) || "unknown"
-		});
+		activity.push({ ...event, path: event.page });
 		localStorage.setItem(activityStorageKey, JSON.stringify(activity.slice(-500)));
+		fetch("/api/analytics/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(event), keepalive: true }).catch(() => {});
 	} catch (error) {
 		// Analytics must never interfere with the website experience.
 	}

@@ -12,7 +12,7 @@ const authTitle = document.getElementById("authTitle");
 const authIntro = document.getElementById("authIntro");
 const authMessage = document.getElementById("authMessage");
 const redirectTarget = new URLSearchParams(window.location.search).get("redirect");
-const redirectPath = redirectTarget && redirectTarget.startsWith("/") && !redirectTarget.startsWith("//") && redirectTarget !== "/auth.html" ? redirectTarget : "/home.html";
+const redirectPath = redirectTarget && redirectTarget.startsWith("/") && !redirectTarget.startsWith("//") && redirectTarget !== "/auth.html" ? redirectTarget : "/index.html";
 const hasSignupUi = Boolean(signupForm && authTabs && signupTab && loginTab && verificationForm && authTitle && authIntro);
 
 const showMessage = (message) => {
