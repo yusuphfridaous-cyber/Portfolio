@@ -30,7 +30,10 @@ const mailTransporter = process.env.SMTP_HOST && process.env.SMTP_USER && smtpPa
     secure: smtpPort === 465,
     auth: { user: process.env.SMTP_USER, pass: smtpPassword }
 }) : null;
-const emailProvider = ((process.env.EMAIL_PROVIDER && process.env.EMAIL_PROVIDER.toLowerCase()) || (mailTransporter ? "smtp" : "resend")).toLowerCase();
+const requestedEmailProvider = (process.env.EMAIL_PROVIDER || "").toLowerCase();
+const emailProvider = requestedEmailProvider === "resend" && !process.env.RESEND_API_KEY && mailTransporter
+    ? "smtp"
+    : (requestedEmailProvider || (mailTransporter ? "smtp" : "resend"));
 const emailVerificationConfigured = emailProvider === "resend"
     ? Boolean(process.env.RESEND_API_KEY)
     : Boolean(mailTransporter);
