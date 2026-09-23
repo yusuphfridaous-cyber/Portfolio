@@ -17,6 +17,7 @@ const port = Number(process.env.PORT) || 3000;
 const adminPassword = process.env.ADMIN_PASSWORD;
 const usersFile = path.join(__dirname, "users.json");
 const analyticsFile = path.join(__dirname, "analytics.json");
+const runtimeUsers = new Map();
 const sessions = new Map();
 const siteSessions = new Map();
 const loginAttempts = new Map();
@@ -79,9 +80,10 @@ const readRequestBody = (request) => new Promise((resolve, reject) => {
 
 const readUsers = () => {
     try {
-        return JSON.parse(fs.readFileSync(usersFile, "utf8"));
+        const storedUsers = JSON.parse(fs.readFileSync(usersFile, "utf8"));
+        return [...storedUsers, ...Array.from(runtimeUsers.values()).filter((user) => !storedUsers.some((storedUser) => storedUser.email === user.email))];
     } catch (error) {
-        return [];
+        return Array.from(runtimeUsers.values());
     }
 };
 
@@ -274,7 +276,11 @@ const server = http.createServer(async (request, response) => {
         }
         const user = { id: crypto.randomUUID(), name, email, passwordHash: await hashPassword(password), createdAt: new Date().toISOString() };
         users.push(user);
-        writeUsers(users);
+        try {
+            writeUsers(users);
+        } catch (error) {
+            runtimeUsers.set(user.email, user);
+        }
         const sessionId = createSiteSession(user.id);
         sendJson(response, 201, { authenticated: true, user: { name: user.name, email } }, { "Set-Cookie": createSessionCookie("site_session", sessionId, request) });
         return;
