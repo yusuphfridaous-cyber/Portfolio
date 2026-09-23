@@ -1,4 +1,18 @@
-  (() => {
+
+(() => {
+	const protectedPages = new Set(["about.html", "projects.html", "contact.html"]);
+	const currentPage = window.location.pathname.split("/").pop() || "index.html";
+
+	if (protectedPages.has(currentPage)) {
+		fetch("/api/auth/session", { credentials: "same-origin" })
+			.then((response) => {
+				if (!response.ok) {
+					window.location.replace(`/auth.html?redirect=${encodeURIComponent(window.location.pathname)}`);
+				}
+			})
+			.catch(() => window.location.replace(`/auth.html?redirect=${encodeURIComponent(window.location.pathname)}`));
+	}
+
 	const supportsFinePointer = window.matchMedia('(pointer: fine)').matches;
 	const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
