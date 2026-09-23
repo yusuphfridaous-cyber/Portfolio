@@ -22,6 +22,7 @@ const siteSessions = new Map();
 const pendingVerifications = new Map();
 const loginAttempts = new Map();
 const sessionDuration = 8 * 60 * 60 * 1000;
+const verificationCodeTtlMinutes = Math.max(10, Number(process.env.VERIFICATION_CODE_TTL_MINUTES) || 30);
 const smtpPort = Number(process.env.SMTP_PORT) || 587;
 const smtpPassword = (process.env.SMTP_PASSWORD || "").replace(/\s+/g, "");
 const mailTransporter = process.env.SMTP_HOST && process.env.SMTP_USER && smtpPassword ? nodemailer.createTransport({
@@ -126,8 +127,8 @@ const sendVerificationEmail = (email, code) => {
                 from: verificationFromAddress,
                 to: [email],
                 subject: "Your website verification code",
-                text: `Your verification code is ${code}. It expires in 10 minutes.`,
-                html: `<p>Your verification code is:</p><p style="font-size: 28px; font-weight: bold; letter-spacing: 6px;">${code}</p><p>This code expires in 10 minutes.</p>`
+                text: `Your verification code is ${code}. It expires in ${verificationCodeTtlMinutes} minutes.`,
+                html: `<p>Your verification code is:</p><p style="font-size: 28px; font-weight: bold; letter-spacing: 6px;">${code}</p><p>This code expires in ${verificationCodeTtlMinutes} minutes.</p>`
             })
         }).then(async (response) => {
             if (!response.ok) throw new Error(`Resend returned ${response.status}.`);
@@ -139,8 +140,8 @@ const sendVerificationEmail = (email, code) => {
         from: verificationFromAddress,
         to: email,
         subject: "Your website verification code",
-        text: `Your verification code is ${code}. It expires in 10 minutes.`,
-        html: `<p>Your verification code is:</p><p style="font-size: 28px; font-weight: bold; letter-spacing: 6px;">${code}</p><p>This code expires in 10 minutes.</p>`
+        text: `Your verification code is ${code}. It expires in ${verificationCodeTtlMinutes} minutes.`,
+        html: `<p>Your verification code is:</p><p style="font-size: 28px; font-weight: bold; letter-spacing: 6px;">${code}</p><p>This code expires in ${verificationCodeTtlMinutes} minutes.</p>`
     });
 };
 
@@ -318,7 +319,7 @@ const server = http.createServer(async (request, response) => {
             passwordHash: await hashPassword(password),
             codeHash: hashVerificationCode(email, code),
             attempts: 0,
-            expiresAt: Date.now() + 10 * 60 * 1000
+            expiresAt: Date.now() + verificationCodeTtlMinutes * 60 * 1000
         });
         try {
             await sendVerificationEmail(email, code);
